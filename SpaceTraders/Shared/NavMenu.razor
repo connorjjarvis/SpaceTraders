@@ -1,0 +1,44 @@
+﻿<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">SpaceTraders</a>
+        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+</div>
+
+<div class="@NavMenuCssClass" @onclick="ToggleNavMenu">
+    <nav class="flex-column">
+        <div class="nav-item">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="bi bi-speedometer pe-1" aria-hidden="true"></span> Home
+            </NavLink>
+        </div>
+        <div class="nav-item">
+            <NavLink class="nav-link" href="headquarters">
+                <span class="bi bi-magic pe-1" aria-hidden="true"></span> HQ
+            </NavLink>
+        </div>
+        <div class="nav-item">
+            <NavLink class="nav-link" href="locationlookup">
+                <span class="bi bi-magic pe-1" aria-hidden="true"></span> Location Lookup
+            </NavLink>
+        </div>
+        <div class="nav-item">
+            <NavLink class="nav-link" href="agent">
+                <span class="bi bi-person-circle pe-1" aria-hidden="true"></span> Agent
+            </NavLink>
+        </div>
+    </nav>
+</div>
+
+@code {
+    private bool collapseNavMenu = true;
+
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+}

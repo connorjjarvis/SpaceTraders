@@ -1,0 +1,60 @@
+﻿@inject IMemoryCache MemoryCache
+@inject RateLimitedQueueManager QueueManager
+@inject SpaceTradersClient SpaceTradersClient
+@implements IDisposable
+
+@page "/"
+@using Microsoft.Extensions.Caching.Memory
+<PageTitle>Index</PageTitle>
+
+<h1>Hello, Agent @Name!</h1>
+
+<h2>Queue data:</h2>
+<p>Current queue status: @QueueManager.GetQueueStatus()</p>
+<p>Next Task: @QueueManager.GetQueue()</p>
+
+
+@code {
+    private System.Threading.Timer _timer;
+    private SpaceTraders.Models.Agent AgentData;
+
+    private string Name => AgentData?.Symbol ?? "Guest";
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+
+    private bool _taskInitialized = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_taskInitialized)
+        {
+            QueueManager.ScheduleRecurringTask(async () =>
+            {
+                await SpaceTradersClient.GetAgentAsync();
+            }, TimeSpan.FromSeconds(30));
+
+            _taskInitialized = true;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _timer = new System.Threading.Timer(_ => InvokeAsync(StateHasChanged), null, 0, 1000);
+
+        if (MemoryCache.TryGetValue("AgentData", out SpaceTraders.Models.Agent agent))
+        {
+            AgentData = agent;
+        }
+        else
+        {
+            AgentData = await SpaceTradersClient.GetAgentAsync();
+            MemoryCache.Set("AgentData", AgentData, new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(1)
+                });
+        }
+    }
+}

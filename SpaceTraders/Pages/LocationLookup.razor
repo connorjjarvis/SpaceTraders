@@ -1,0 +1,79 @@
+﻿@page "/locationlookup"
+
+<PageTitle>Location lookup</PageTitle>
+
+@using SpaceTraders.Models
+@using SpaceTradersApp.Data
+@using System.Text.Json
+@inject LocationService Location
+
+<h1>Location lookup</h1>
+
+<EditForm Model="Model" OnValidSubmit="Submit" FormName="Lookup">
+    <InputText @bind-Value="Model!.sector" />
+    <InputText @bind-Value="Model!.waypoint" />
+    
+    <button class="btn btn-primary" type="submit">Lookup</button>
+</EditForm>
+
+@if (location == null)
+{
+    <p><em>...</em></p>
+}
+else
+{
+    <p>System: @location.SystemSymbol</p>
+    <p>Symbol: @location.Symbol</p>
+    <p>Type: @location.Type</p>
+    <p>X,Y: @location.X , @location.Y</p>
+    <p>Orbitals:</p>
+    @if (location.Orbitals != null && location.Orbitals.Any())
+    {
+        <ul>
+            @foreach (var orbital in location.Orbitals)
+            {
+                <li>@JsonSerializer.Serialize(orbital, new JsonSerializerOptions { WriteIndented = true })</li>
+            }
+        </ul>
+    }
+    else
+    {
+        <p>No Orbitals</p>
+    }
+
+    <p>Traits: @JsonSerializer.Serialize(location.Traits, new JsonSerializerOptions { WriteIndented = true })</p>
+    <p>Modifiers: @JsonSerializer.Serialize(location.Modifiers, new JsonSerializerOptions { WriteIndented = true })</p>
+    <p>Chart: Submitted by @location.Chart.SubmittedBy on @location.Chart.SubmittedOn</p>
+    <p>Faction: @location.Faction.Symbol</p>
+    <p>isUnderConstruction: @(location.IsUnderConstruction ? "Yes" : "No")</p>
+}
+
+
+@code {
+    public class LocationLookupModel
+    {
+        public string sector { get; set; }
+        public string waypoint { get; set; }
+    }
+    private EditContext? editContext;
+
+    private LocationLookupModel Model { get; set; }
+
+    private Location location;
+
+    protected override void OnInitialized()
+    {
+        Model ??=
+            new()
+                {
+                    sector = "X1-C46",
+                    waypoint = "X1-C46-A1"
+                };
+        editContext = new(Model);
+    }
+
+    private async Task Submit()
+    {
+        location = await Location.GetLocationAsync(Model.sector, Model.waypoint);
+    }
+}

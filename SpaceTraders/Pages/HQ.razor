@@ -1,0 +1,149 @@
+﻿@page "/headquarters"
+@inject IMemoryCache MemoryCache
+@inject RateLimitedQueueManager QueueManager
+@inject SpaceTradersClient SpaceTradersClient
+@inject LocationService Location
+
+<PageTitle>Location lookup</PageTitle>
+
+@using SpaceTraders.Models
+@using SpaceTradersApp.Data
+@using System.Text.Json
+@using Microsoft.Extensions.Caching.Memory
+
+<h1>Headquarters</h1>
+
+@if (system == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <button @onclick="ZoomIn">Zoom In</button>
+    <button @onclick="ZoomOut">Zoom Out</button>
+
+    <div class="svg-container"
+         @onmousedown="StartDrag"
+         @onmousemove="OnDrag"
+         @onmouseup="EndDrag"
+         @onmouseout="EndDrag"
+         @onmousewheel="OnMouseWheel"
+         style="width: 100%; height: 100%; overflow: hidden; cursor: grab;">
+        <svg width="@svgWidth" height="@svgHeight" style="border: 1px solid black;">
+        <g transform="@($"translate({translationX}, {translationY})")">
+            @foreach (var obj in system.Waypoints)
+            {
+                int adjustedX = centerX + (int)(obj.X * scaleFactor);
+                int adjustedY = centerY - (int)(obj.Y * scaleFactor);
+
+                double orbitRadius = Math.Sqrt(Math.Pow(obj.X, 2) + Math.Pow(obj.Y, 2)) * scaleFactor;
+
+                <circle cx="@centerX" cy="@centerY" r="@orbitRadius" stroke="gray" fill="none" stroke-dasharray="2,2"/>
+                    <circle cx="@adjustedX" cy="@adjustedY" r="5" fill="@GetColorByType(obj.Type)" />
+                    <text><text x="@adjustedX" y="@adjustedY + 5" fill="black" dominant-baseline="middle" text-anchor="middle">@obj.Type</text></text>
+                }
+            </g>
+        </svg>
+    </div>
+}
+
+@code {
+    private double scaleFactor = 1; 
+    private int svgWidth = 1000; 
+    private int svgHeight = 1000;
+    private int centerX = 500; 
+    private int centerY = 500;
+
+    private bool isDragging = false;
+    private double startDragX = 0;
+    private double startDragY = 0;
+    private double translationX = 0;
+    private double translationY = 0;
+
+    private void ZoomIn()
+    {
+        scaleFactor *= 1.1;
+        StateHasChanged();
+    }
+
+    private void ZoomOut()
+    {
+        scaleFactor *= 0.9;
+        StateHasChanged();
+    }
+
+    private System.Threading.Timer _timer;
+    private SpaceTraders.Models.Agent AgentData;
+    private LocalSystem? system;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _timer = new System.Threading.Timer(_ => InvokeAsync(StateHasChanged), null, 0, 10000);
+
+        AgentData = await MemoryCache.GetOrCreateAsync("AgentData", async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(1);
+            return await SpaceTradersClient.GetAgentAsync();
+        });
+
+        string sector = AgentData.Headquarters.Split('-')[0] + '-' + AgentData.Headquarters.Split('-')[1];
+        system = await Location.GetSystemAsync(sector);
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+
+    private void StartDrag(MouseEventArgs e)
+    {
+        isDragging = true;
+        startDragX = e.ClientX - translationX;
+        startDragY = e.ClientY - translationY;
+    }
+
+    private void OnDrag(MouseEventArgs e)
+    {
+        if (isDragging)
+        {
+            translationX = e.ClientX - startDragX;
+            translationY = e.ClientY - startDragY;
+            StateHasChanged();
+        }
+    }
+
+    private void EndDrag(MouseEventArgs e)
+    {
+        isDragging = false;
+    }
+
+    private void OnMouseWheel(WheelEventArgs e)
+    {
+        if (e.DeltaY > 0)
+        {
+            ZoomOut();
+        }
+        else
+        {
+            ZoomIn();
+        }
+    }
+
+    private string GetColorByType(string type)
+    {
+        return type switch
+        {
+            "ASTEROID" => "gray",
+            "FUEL_STATION" => "green",
+            "ORBITAL_STATION" => "blue",
+            "PLANET" => "brown",
+            "MOON" => "lightgray",
+            _ => "red", 
+        };
+    }
+
+    protected override Task OnParametersSetAsync()
+    {
+        return base.OnParametersSetAsync();
+    }
+}

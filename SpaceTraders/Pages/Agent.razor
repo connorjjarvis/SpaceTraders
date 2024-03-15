@@ -1,0 +1,31 @@
+﻿@page "/agent"
+
+<PageTitle>Agent</PageTitle>
+
+@using SpaceTradersApp.Data
+@inject AgentService AgentService
+
+<h1>Agent</h1>
+
+@if (agent == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <p><strong>Account ID: </strong>@agent.AccountId</p>
+    <p><strong>Symbol: </strong>@agent.Symbol</p>
+    <p><strong>Headquarters: </strong>@agent.Headquarters</p>
+    <p><strong>Credits: </strong>@agent.Credits</p>
+    <p><strong>StartingFaction: </strong>@agent.StartingFaction</p>
+    <p><strong>ShipCount: </strong>@agent.ShipCount</p>
+}
+
+@code {
+    private Models.Agent agent;
+
+    protected override async Task OnInitializedAsync()
+    {
+        agent = await AgentService.GetAgentAsync();
+    }
+}
