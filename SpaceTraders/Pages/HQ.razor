@@ -1,5 +1,6 @@
 ﻿@page "/headquarters"
 @inject IMemoryCache MemoryCache
+@inject IJSRuntime JSRuntime;
 @inject RateLimitedQueueManager QueueManager
 @inject SpaceTradersClient SpaceTradersClient
 @inject LocationService Location
@@ -15,43 +16,23 @@
 
 @if (system == null)
 {
-    <p><em>Loading...</em></p>
+    <p><em>Scanning...</em></p>
 }
 else
 {
-    <button @onclick="ZoomIn">Zoom In</button>
-    <button @onclick="ZoomOut">Zoom Out</button>
-
-    <div class="svg-container"
-         @onmousedown="StartDrag"
-         @onmousemove="OnDrag"
-         @onmouseup="EndDrag"
-         @onmouseout="EndDrag"
-         @onmousewheel="OnMouseWheel"
-         style="width: 100%; height: 100%; overflow: hidden; cursor: grab;">
-        <svg width="@svgWidth" height="@svgHeight" style="border: 1px solid black;">
-        <g transform="@($"translate({translationX}, {translationY})")">
-            @foreach (var obj in system.Waypoints)
-            {
-                int adjustedX = centerX + (int)(obj.X * scaleFactor);
-                int adjustedY = centerY - (int)(obj.Y * scaleFactor);
-
-                double orbitRadius = Math.Sqrt(Math.Pow(obj.X, 2) + Math.Pow(obj.Y, 2)) * scaleFactor;
-
-                <circle cx="@centerX" cy="@centerY" r="@orbitRadius" stroke="gray" fill="none" stroke-dasharray="2,2"/>
-                    <circle cx="@adjustedX" cy="@adjustedY" r="5" fill="@GetColorByType(obj.Type)" />
-                    <text><text x="@adjustedX" y="@adjustedY + 5" fill="black" dominant-baseline="middle" text-anchor="middle">@obj.Type</text></text>
-                }
-            </g>
-        </svg>
-    </div>
+    <canvas width="1000" height="1000" @ref="canvasRef"
+            @onmousedown="StartDrag" @onmouseup="EndDrag"
+            @onmousemove="OnDrag" @onmousewheel="OnMouseWheel"
+            style="border: 1px solid white; cursor: grab; background-color: black;">
+    </canvas>
 }
 
 @code {
-    private double scaleFactor = 1; 
-    private int svgWidth = 1000; 
+
+    private double scaleFactor = 1;
+    private int svgWidth = 1000;
     private int svgHeight = 1000;
-    private int centerX = 500; 
+    private int centerX = 500;
     private int centerY = 500;
 
     private bool isDragging = false;
@@ -129,21 +110,34 @@ else
         }
     }
 
-    private string GetColorByType(string type)
-    {
-        return type switch
-        {
-            "ASTEROID" => "gray",
-            "FUEL_STATION" => "green",
-            "ORBITAL_STATION" => "blue",
-            "PLANET" => "brown",
-            "MOON" => "lightgray",
-            _ => "red", 
-        };
-    }
+
 
     protected override Task OnParametersSetAsync()
     {
         return base.OnParametersSetAsync();
+    }
+
+    private ElementReference canvasRef;
+
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            string sector = AgentData.Headquarters.Split('-')[0] + '-' + AgentData.Headquarters.Split('-')[1];
+            system = await Location.GetSystemAsync(sector);
+            system.Waypoints.Add(new Waypoint
+                {
+                    X = 0,
+                    Y = 0,
+                    Symbol = system.Symbol,
+                    Type = system.Type
+                });
+        }
+        if (system != null)
+        {
+            await JSRuntime.InvokeVoidAsync("drawWaypoints", canvasRef, system.Waypoints, scaleFactor, translationX, translationY);
+        }
     }
 }
